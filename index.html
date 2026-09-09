@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/icons/icon-48.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#B4F526" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12160E" media="(prefers-color-scheme: dark)" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="TakeCare" />
+    <title>TakeCare</title>
+    <style>
+      /* Pre-JS splash background -- can't use tokens.css here since that
+         loads as part of the JS bundle; kept in sync with --tc-bg by hand. */
+      #tc-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fbfcf7;
+      }
+      @media (prefers-color-scheme: dark) {
+        #tc-splash {
+          background: #12160e;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Removed by main.tsx once React has mounted. Mirrors
+         src/components/LoadingScreen.tsx so app open on a phone shows the
+         same pulse from the very first paint, before any JS has run. -->
+    <div id="tc-splash">
+      <div
+        style="
+          width: 64px;
+          height: 64px;
+          border-radius: 20px;
+          background: #b4f526;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #1d3201;
+          box-shadow: 0 6px 18px rgba(149, 220, 6, 0.32);
+        "
+      >
+        <svg width="38" height="38" viewBox="0 0 48 48" role="img" aria-label="TakeCare">
+          <rect
+            x="7"
+            y="18"
+            width="34"
+            height="16"
+            rx="8"
+            transform="rotate(-38 24 26)"
+            fill="currentColor"
+            opacity="0.2"
+          />
+          <path
+            d="M6 24h7.5l4-9.5L24 32l4-9h10"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle r="3" fill="currentColor">
+            <animateMotion dur="1.5s" repeatCount="indefinite" path="M6 24h7.5l4-9.5L24 32l4-9h10" />
+            <animate
+              attributeName="opacity"
+              values="0;1;1;0"
+              keyTimes="0;0.1;0.9;1"
+              dur="1.5s"
+              repeatCount="indefinite"
+            />
+          </circle>
+        </svg>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
