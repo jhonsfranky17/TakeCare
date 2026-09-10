@@ -12,6 +12,7 @@ export type Dose = {
   scheduledTime: string; // "9:00 PM"
   status: DoseStatus;
   takenAt: string | null; // "8:12 AM" | "just now"
+  notes: string | null; // "Take with food"
 };
 
 export type HistoryRow = {
@@ -38,6 +39,7 @@ export type ViewMedicine = {
   stockCapacity: number;
   runsOut: string; // "runs out Friday"
   low: boolean;
+  notes: string | null;
 };
 
 export type ViewFamilyMember = {

@@ -60,6 +60,11 @@ export function DoseCard({
           <div style={{ fontSize: 'var(--tc-fs-body)', fontWeight: 400, color: 'var(--tc-ink-muted)' }}>
             {dose.dosage} · {dose.scheduledTime}
           </div>
+          {dose.notes && (
+            <div style={{ fontSize: 13, fontWeight: 400, fontStyle: 'italic', color: 'var(--tc-ink-muted)' }}>
+              {dose.notes}
+            </div>
+          )}
         </div>
         <StatusBadge
           status={dose.status}

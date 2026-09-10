@@ -2,8 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { NavBar } from "./components/NavBar";
 import { LoadingScreen } from "./components/LoadingScreen";
-import { Login } from "./screens/Login";
-import { Onboarding } from "./screens/Onboarding";
+import { WhoAreYou } from "./screens/WhoAreYou";
 import { Home } from "./screens/Home";
 import { History } from "./screens/History";
 import { MedicinesAdmin } from "./screens/MedicinesAdmin";
@@ -21,6 +20,17 @@ const shell = {
   WebkitFontSmoothing: "antialiased",
 } as const;
 
+const centered = {
+  flex: 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "var(--tc-ink-muted)",
+  fontSize: 15,
+  textAlign: "center",
+  padding: "0 28px",
+} as const;
+
 function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
   const { session, familyMember, loading } = useAuth();
 
@@ -28,10 +38,13 @@ function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
     return <LoadingScreen />;
   }
   if (!session) {
-    return <Navigate to="/login" replace />;
+    // Only reached if the silent anonymous sign-in itself failed (e.g. it's
+    // disabled on the project, or a network error) -- there's no login
+    // screen to fall back to anymore.
+    return <div style={centered}>Couldn&rsquo;t connect. Check your connection and reload.</div>;
   }
   if (!familyMember) {
-    return <Onboarding />;
+    return <WhoAreYou />;
   }
   return children;
 }
@@ -44,7 +57,6 @@ function AppShell(): JSX.Element {
       <div style={shell}>
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <Routes>
-            <Route path="/login" element={<Login />} />
             <Route
               path="/"
               element={

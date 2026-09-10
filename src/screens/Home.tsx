@@ -45,6 +45,7 @@ function toViewDose(dose: DoseWithMedicine): Dose {
     scheduledTime: formatTime(dose.scheduled_time),
     status: dose.status,
     takenAt: dose.taken_time ? formatTime(dose.taken_time) : null,
+    notes: dose.medicine.notes,
   };
 }
 
@@ -71,7 +72,7 @@ export function Home(): JSX.Element {
       .from("intake_logs")
       .select(
         `id, medicine_id, scheduled_time, taken_time, status, created_at,
-         medicine:medicines ( id, patient_id, name, dosage_per_intake, times_per_day, current_stock, refill_threshold_days, low_stock_alert_sent_at, created_at )`,
+         medicine:medicines ( id, patient_id, name, dosage_per_intake, times_per_day, current_stock, refill_threshold_days, low_stock_alert_sent_at, notes, created_at )`,
       )
       .gte("scheduled_time", startOfTodayIso())
       .lte("scheduled_time", endOfTodayIso())
@@ -98,6 +99,9 @@ export function Home(): JSX.Element {
       .from("family_members")
       .select("id, name")
       .neq("id", familyMember.id)
+      // Someone who's been pre-added but hasn't opened the app yet can't
+      // have a push subscription -- don't claim they were notified.
+      .not("auth_user_id", "is", null)
       .then(({ data }) => setOtherNames((data ?? []).map((m) => m.name)));
   }, [familyMember]);
 

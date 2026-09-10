@@ -47,6 +47,7 @@ export function AddMedicineSheet({
   const [times, setTimes] = useState<string[]>(
     editing ? editing.times_per_day.map(to12h) : ["8:00 AM", "9:00 PM"],
   );
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [addingTime, setAddingTime] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export function AddMedicineSheet({
 
     const dosagePerIntake = Number(dosage) || 1;
     const currentStock = Number(stock) || 0;
+    const trimmedNotes = notes.trim();
 
     const { error: saveError } = editing
       ? await supabase
@@ -69,6 +71,7 @@ export function AddMedicineSheet({
             dosage_per_intake: dosagePerIntake,
             current_stock: currentStock,
             times_per_day: times24h,
+            notes: trimmedNotes || null,
             // Topping stock back above the refill threshold resets the alert
             // flag so a future dip below it fires again (build spec 9.3).
             low_stock_alert_sent_at:
@@ -83,6 +86,7 @@ export function AddMedicineSheet({
           dosage_per_intake: dosagePerIntake,
           current_stock: currentStock,
           times_per_day: times24h,
+          notes: trimmedNotes || null,
           patient_id: patient.id,
           refill_threshold_days: 7,
         });
@@ -299,6 +303,27 @@ export function AddMedicineSheet({
               </button>
             )}
           </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <label htmlFor="tc-notes" style={labelStyle}>
+            Notes (optional)
+          </label>
+          <textarea
+            id="tc-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Take with food, the small white one"
+            rows={2}
+            style={{
+              ...field,
+              height: "auto",
+              minHeight: 64,
+              padding: "14px 16px",
+              resize: "vertical",
+              fontFamily: "var(--tc-font)",
+            }}
+          />
         </div>
 
         {error && (

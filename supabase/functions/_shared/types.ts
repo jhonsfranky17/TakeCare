@@ -15,6 +15,7 @@ export interface Medicine {
   current_stock: number;
   refill_threshold_days: number;
   low_stock_alert_sent_at: string | null;
+  notes: string | null;
   created_at: string;
 }
 

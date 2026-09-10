@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
 import { initialsOf } from "../lib/format";
@@ -7,28 +7,45 @@ import { Toast } from "../ui/Toast";
 import { LoadingScreen } from "../components/LoadingScreen";
 import type { FamilyMember } from "../lib/types";
 
+const field = {
+  height: 52,
+  borderRadius: 16,
+  border: "1.5px solid var(--tc-line)",
+  background: "var(--tc-card)",
+  padding: "0 16px",
+  fontFamily: "var(--tc-font)",
+  fontSize: 15,
+  fontWeight: 500,
+  color: "var(--tc-ink)",
+  outline: "none",
+} as const;
+
 export function Family(): JSX.Element {
   const { patient, familyMember } = useAuth();
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [addingName, setAddingName] = useState("");
+  const [addingRelationship, setAddingRelationship] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const loadMembers = async (): Promise<void> => {
+    const { data, error: fetchError } = await supabase
+      .from("family_members")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (fetchError) {
+      setError(fetchError.message);
+    } else {
+      setMembers(data ?? []);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function load(): Promise<void> {
-      const { data, error: fetchError } = await supabase
-        .from("family_members")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (fetchError) {
-        setError(fetchError.message);
-      } else {
-        setMembers(data ?? []);
-      }
-      setLoading(false);
-    }
-    void load();
+    void loadMembers();
   }, []);
 
   const inviteLink = window.location.origin;
@@ -36,6 +53,32 @@ export function Family(): JSX.Element {
   const handleInvite = async (): Promise<void> => {
     await navigator.clipboard.writeText(inviteLink);
     setToast("Invite link copied, send it to whoever should get updates.");
+  };
+
+  // Pre-adds someone who hasn't opened the app yet, so they see themselves
+  // waiting to be claimed the first time they do (no email involved at all
+  // -- this device just inserts a placeholder row for them by name).
+  const handleAddPlaceholder = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!patient || !addingName.trim() || !addingRelationship.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    const { error: insertError } = await supabase.from("family_members").insert({
+      patient_id: patient.id,
+      name: addingName.trim(),
+      relationship: addingRelationship.trim(),
+      auth_user_id: null,
+    });
+    setSaving(false);
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+    setAddingName("");
+    setAddingRelationship("");
+    await loadMembers();
   };
 
   if (loading) {
@@ -83,6 +126,7 @@ export function Family(): JSX.Element {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {members.map((member) => {
           const isSelf = member.id === familyMember?.id;
+          const joined = member.auth_user_id !== null;
           return (
             <div
               key={member.id}
@@ -95,6 +139,7 @@ export function Family(): JSX.Element {
                 alignItems: "center",
                 gap: 14,
                 boxShadow: "var(--tc-shadow)",
+                opacity: joined ? 1 : 0.7,
               }}
             >
               <div
@@ -134,6 +179,7 @@ export function Family(): JSX.Element {
                   }}
                 >
                   {member.relationship ?? "Family member"}
+                  {!joined && " · hasn't opened the app yet"}
                 </div>
               </div>
               {isSelf && (
@@ -163,26 +209,41 @@ export function Family(): JSX.Element {
           padding: 20,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
-          alignItems: "flex-start",
+          gap: 14,
+          alignItems: "stretch",
           background: "var(--tc-card)",
         }}
       >
-        <div style={{ fontSize: 16, fontWeight: 600 }}>
-          Add someone to the family
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Add someone to the family</div>
+          <div style={{ fontSize: 13.5, fontWeight: 400, lineHeight: 1.5, color: "var(--tc-ink-muted)" }}>
+            Add their name now — they&rsquo;ll see themselves waiting the first time they open the app on
+            their own phone, no email needed.
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: 13.5,
-            fontWeight: 400,
-            lineHeight: 1.5,
-            color: "var(--tc-ink-muted)",
-          }}
-        >
-          Send a link and they'll start getting dose updates.
-        </div>
-        <Button variant="dark" onClick={() => void handleInvite()}>
-          Share invite link
+
+        <form onSubmit={(e) => void handleAddPlaceholder(e)} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <input
+            value={addingName}
+            onChange={(e) => setAddingName(e.target.value)}
+            placeholder="Their name"
+            aria-label="Name"
+            style={field}
+          />
+          <input
+            value={addingRelationship}
+            onChange={(e) => setAddingRelationship(e.target.value)}
+            placeholder="Relationship, e.g. Daughter"
+            aria-label="Relationship"
+            style={field}
+          />
+          <Button variant="dark" type="submit" disabled={saving || !addingName.trim() || !addingRelationship.trim()}>
+            {saving ? "Adding…" : "Add to the family"}
+          </Button>
+        </form>
+
+        <Button variant="quiet" style={{ alignSelf: "center" }} onClick={() => void handleInvite()}>
+          or just share the app link
         </Button>
       </div>
 

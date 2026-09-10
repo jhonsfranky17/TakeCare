@@ -13,12 +13,13 @@ interface AuthState {
   session: Session | null;
   familyMember: FamilyMember | null;
   patient: Patient | null;
+  unclaimedMembers: FamilyMember[];
   loading: boolean;
-  signOut: () => Promise<void>;
-  // Creates this user's family_members row with a name/relationship they
-  // chose themselves (see Onboarding screen). TakeCare is a single-patient
-  // deployment (build spec section 2), so this links them to the one
-  // existing patient.
+  // Claims an existing, unclaimed family_members row as this device's
+  // identity (the "who are you?" picker).
+  claimFamilyMember: (id: string) => Promise<void>;
+  // Creates a brand-new family_members row and claims it in one step (the
+  // "not listed? add yourself" path, and Family screen's "add someone").
   completeOnboarding: (name: string, relationship: string) => Promise<void>;
 }
 
@@ -28,29 +29,25 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const [session, setSession] = useState<Session | null>(null);
   const [familyMember, setFamilyMember] = useState<FamilyMember | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [unclaimedMembers, setUnclaimedMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadForSession(current: Session | null): Promise<void> {
+    async function loadForSession(current: Session): Promise<void> {
       setSession(current);
 
-      if (!current) {
-        setFamilyMember(null);
-        setPatient(null);
-        setLoading(false);
-        return;
-      }
-
-      const [{ data: patientRow }, { data: memberRow, error: memberError }] = await Promise.all([
-        supabase.from("patients").select("*").limit(1).maybeSingle(),
-        supabase
-          .from("family_members")
-          .select("*")
-          .eq("auth_user_id", current.user.id)
-          .maybeSingle(),
-      ]);
+      const [{ data: patientRow }, { data: memberRow, error: memberError }, { data: unclaimedRows }] =
+        await Promise.all([
+          supabase.from("patients").select("*").limit(1).maybeSingle(),
+          supabase
+            .from("family_members")
+            .select("*")
+            .eq("auth_user_id", current.user.id)
+            .maybeSingle(),
+          supabase.from("family_members").select("*").is("auth_user_id", null),
+        ]);
 
       if (!isMounted) return;
 
@@ -59,16 +56,36 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         console.error("failed to look up family member:", memberError);
       }
       setFamilyMember(memberRow ?? null);
+      setUnclaimedMembers(unclaimedRows ?? []);
       setLoading(false);
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      void loadForSession(data.session);
-    });
+    async function init(): Promise<void> {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        await loadForSession(data.session);
+        return;
+      }
+
+      // No device has ever opened this app before -- sign in anonymously,
+      // no user interaction needed. This is a real (if anonymous) session,
+      // so RLS still applies once a family_members row is claimed under it.
+      const { data: anon, error } = await supabase.auth.signInAnonymously();
+      if (error || !anon.session) {
+        console.error("anonymous sign-in failed:", error);
+        if (isMounted) setLoading(false);
+        return;
+      }
+      await loadForSession(anon.session);
+    }
+
+    void init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
-      setLoading(true);
-      void loadForSession(next);
+      if (next) {
+        setLoading(true);
+        void loadForSession(next);
+      }
     });
 
     return () => {
@@ -77,8 +94,22 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     };
   }, []);
 
-  const signOut = async (): Promise<void> => {
-    await supabase.auth.signOut();
+  const claimFamilyMember = async (id: string): Promise<void> => {
+    if (!session) {
+      throw new Error("No session to claim a family member with");
+    }
+    const { data: claimed, error } = await supabase
+      .from("family_members")
+      .update({ auth_user_id: session.user.id })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+    setFamilyMember(claimed);
+    setUnclaimedMembers((prev) => prev.filter((m) => m.id !== id));
   };
 
   const completeOnboarding = async (name: string, relationship: string): Promise<void> => {
@@ -104,7 +135,15 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   return (
     <AuthContext.Provider
-      value={{ session, familyMember, patient, loading, signOut, completeOnboarding }}
+      value={{
+        session,
+        familyMember,
+        patient,
+        unclaimedMembers,
+        loading,
+        claimFamilyMember,
+        completeOnboarding,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { daysRemaining, joinNames, joinTimes, runsOutLabel, to12h } from "../lib/format";
 import { LowStockNudge, StockBar } from "../ui/StockBar";
@@ -7,6 +7,8 @@ import { AddMedicineSheet } from "./AddMedicineSheet";
 import { LoadingScreen } from "../components/LoadingScreen";
 import type { Medicine } from "../lib/types";
 import type { ViewMedicine } from "../ui/viewTypes";
+
+const PAGE_SIZE = 5;
 
 function toViewMedicine(m: Medicine): ViewMedicine {
   const remaining = daysRemaining(m.current_stock, m.dosage_per_intake, m.times_per_day.length);
@@ -21,6 +23,7 @@ function toViewMedicine(m: Medicine): ViewMedicine {
     stockCapacity: Math.max(m.refill_threshold_days * dailyDoses * 3, m.current_stock, 1),
     runsOut: runsOutLabel(remaining),
     low,
+    notes: m.notes,
   };
 }
 
@@ -30,6 +33,8 @@ export function MedicinesAdmin(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [sheetFor, setSheetFor] = useState<Medicine | "new" | null>(null);
+  const [query, setQuery] = useState<string>("");
+  const [page, setPage] = useState<number>(0);
 
   const loadMedicines = async (): Promise<void> => {
     const { data, error: fetchError } = await supabase
@@ -50,16 +55,29 @@ export function MedicinesAdmin(): JSX.Element {
     supabase
       .from("family_members")
       .select("name")
+      .not("auth_user_id", "is", null)
       .then(({ data }) => setOtherNames((data ?? []).map((m) => m.name)));
   }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return medicines;
+    return medicines.filter((m) => m.name.toLowerCase().includes(q));
+  }, [medicines, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
+  const viewMedicines = paged.map(toViewMedicine);
+  const lowCount = medicines.filter((m) => {
+    const remaining = daysRemaining(m.current_stock, m.dosage_per_intake, m.times_per_day.length);
+    return remaining <= m.refill_threshold_days;
+  }).length;
+  const recipient = joinNames(otherNames) || "the family";
 
   if (loading) {
     return <LoadingScreen />;
   }
-
-  const viewMedicines = medicines.map(toViewMedicine);
-  const lowCount = viewMedicines.filter((m) => m.low).length;
-  const recipient = joinNames(otherNames) || "the family";
 
   return (
     <div style={{ padding: "62px 20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -97,71 +115,152 @@ export function MedicinesAdmin(): JSX.Element {
         </button>
       </div>
 
+      {medicines.length > PAGE_SIZE && (
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Search medicines…"
+          aria-label="Search medicines"
+          style={{
+            height: 48,
+            borderRadius: 16,
+            border: "1.5px solid var(--tc-line)",
+            background: "var(--tc-card)",
+            padding: "0 16px",
+            fontFamily: "var(--tc-font)",
+            fontSize: 15,
+            fontWeight: 500,
+            color: "var(--tc-ink)",
+            outline: "none",
+          }}
+        />
+      )}
+
       {error && <div style={{ fontSize: 13.5, color: "var(--tc-warn-ink)" }}>{error}</div>}
 
-      {medicines.map((medicine, i) => {
-        const view = viewMedicines[i];
-        if (!view) return null;
-        return (
-          <div
-            key={medicine.id}
+      {filtered.length === 0 ? (
+        <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
+          No medicines match &ldquo;{query}&rdquo;.
+        </div>
+      ) : (
+        paged.map((medicine, i) => {
+          const view = viewMedicines[i];
+          if (!view) return null;
+          return (
+            <div
+              key={medicine.id}
+              style={{
+                background: "var(--tc-card)",
+                border: "1px solid var(--tc-line)",
+                borderRadius: "var(--tc-r-card)",
+                padding: 18,
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                boxShadow: "var(--tc-shadow)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: "var(--tc-pill)",
+                    flex: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--tc-ok-ink)",
+                  }}
+                >
+                  <PillIcon size={22} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.2px" }}>{view.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 400, color: "var(--tc-ink-muted)" }}>
+                    {view.dosage} · {view.schedule}
+                  </div>
+                  {view.notes && (
+                    <div style={{ fontSize: 13, fontWeight: 400, fontStyle: "italic", color: "var(--tc-ink-muted)" }}>
+                      {view.notes}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSheetFor(medicine)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--tc-ink-muted)",
+                    fontFamily: "var(--tc-font)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    minHeight: "var(--tc-tap-min)",
+                    minWidth: "var(--tc-tap-min)",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+              <StockBar medicine={view} />
+              {view.low && <LowStockNudge recipient={recipient} />}
+            </div>
+          );
+        })
+      )}
+
+      {pageCount > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={clampedPage === 0}
             style={{
-              background: "var(--tc-card)",
-              border: "1px solid var(--tc-line)",
-              borderRadius: "var(--tc-r-card)",
-              padding: 18,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              boxShadow: "var(--tc-shadow)",
+              minHeight: "var(--tc-tap-min)",
+              minWidth: "var(--tc-tap-min)",
+              border: "none",
+              borderRadius: "var(--tc-r-badge)",
+              background: "var(--tc-pill)",
+              color: clampedPage === 0 ? "var(--tc-line)" : "var(--tc-ink-muted)",
+              fontFamily: "var(--tc-font)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: clampedPage === 0 ? "default" : "pointer",
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  background: "var(--tc-pill)",
-                  flex: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--tc-ok-ink)",
-                }}
-              >
-                <PillIcon size={22} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.2px" }}>{view.name}</div>
-                <div style={{ fontSize: 14, fontWeight: 400, color: "var(--tc-ink-muted)" }}>
-                  {view.dosage} · {view.schedule}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSheetFor(medicine)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--tc-ink-muted)",
-                  fontFamily: "var(--tc-font)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  minHeight: "var(--tc-tap-min)",
-                  minWidth: "var(--tc-tap-min)",
-                  textDecoration: "underline",
-                }}
-              >
-                Edit
-              </button>
-            </div>
-            <StockBar medicine={view} />
-            {view.low && <LowStockNudge recipient={recipient} />}
-          </div>
-        );
-      })}
+            Prev
+          </button>
+          <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--tc-ink-muted)" }}>
+            Page {clampedPage + 1} of {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={clampedPage >= pageCount - 1}
+            style={{
+              minHeight: "var(--tc-tap-min)",
+              minWidth: "var(--tc-tap-min)",
+              border: "none",
+              borderRadius: "var(--tc-r-badge)",
+              background: "var(--tc-pill)",
+              color: clampedPage >= pageCount - 1 ? "var(--tc-line)" : "var(--tc-ink-muted)",
+              fontFamily: "var(--tc-font)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: clampedPage >= pageCount - 1 ? "default" : "pointer",
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {sheetFor && (
         <AddMedicineSheet

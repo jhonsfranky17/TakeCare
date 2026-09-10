@@ -15,6 +15,7 @@ export type Medicine = {
   current_stock: number;
   refill_threshold_days: number;
   low_stock_alert_sent_at: string | null;
+  notes: string | null;
   created_at: string;
 };
 
@@ -27,12 +28,15 @@ export type IntakeLog = {
   created_at: string;
 };
 
+// auth_user_id is null for an unclaimed placeholder row (added ahead of
+// time via the Family screen, or never claimed) -- see the "pick your
+// name" auth flow in AuthContext.tsx.
 export type FamilyMember = {
   id: string;
   patient_id: string;
   name: string;
   relationship: string | null;
-  auth_user_id: string;
+  auth_user_id: string | null;
   created_at: string;
 };
 
@@ -69,8 +73,9 @@ export type Database = {
       };
       medicines: {
         Row: Medicine;
-        Insert: Omit<Medicine, "id" | "created_at" | "low_stock_alert_sent_at"> & {
+        Insert: Omit<Medicine, "id" | "created_at" | "low_stock_alert_sent_at" | "notes"> & {
           low_stock_alert_sent_at?: string | null;
+          notes?: string | null;
         };
         Update: Partial<Omit<Medicine, "id" | "created_at">>;
         Relationships: Relationship[];

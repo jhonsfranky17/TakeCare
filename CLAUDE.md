@@ -23,9 +23,18 @@ There is no test runner configured.
 
 ## Architecture
 
-### Single-patient model, explicit onboarding (not auto-bootstrap)
+### Auth: no email, no login screen -- anonymous sign-in + "pick your name"
 
-There is exactly one row in `patients` for the whole deployment (see spec §2 non-goals). `AuthContext.tsx` fetches that one `patients` row and the signed-in user's `family_members` row (if any) on every session change, in parallel — it does **not** create the `family_members` row itself. If none exists, `App.tsx`'s `RequireAuth` renders the `Onboarding` screen instead of the requested route; that screen collects a name and a free-text relationship ("Daughter", "Caregiver", ...) and calls `AuthContext`'s `completeOnboarding(name, relationship)`, which inserts the row and pushes it straight into context state (no refetch). If `patients` is empty, `Onboarding` shows a static "ask whoever's setting up TakeCare" message instead of a form — always make sure a patient row exists before testing auth end to end.
+There is no email/password/magic-link flow anywhere in this app (there used to be; it was removed). `AuthContext.tsx` signs every device in with `supabase.auth.signInAnonymously()` automatically on first load, no user interaction -- this is a real Supabase session (`role: authenticated`, RLS applies normally), it's just not tied to an email. That anonymous session then has to *claim* one `family_members` row to identify itself:
+
+- `family_members.auth_user_id` is **nullable** -- a row with `auth_user_id = null` is an unclaimed placeholder (pre-added by someone via the Family screen's "Add someone to the family" form, giving just a name + relationship, no email) or a not-yet-claimed seed row.
+- `App.tsx`'s `RequireAuth` renders `WhoAreYou` (not a route, just a conditional render, same pattern the old `Onboarding` used) whenever the signed-in device hasn't claimed a row yet. It lists every unclaimed row for tapping (`AuthContext`'s `claimFamilyMember(id)`, an `UPDATE ... SET auth_user_id = <this device's uid> WHERE auth_user_id IS NULL`), or -- if nobody's listed, or you're not one of them -- a small form which creates *and* claims a new row in one step (`completeOnboarding(name, relationship)`, unchanged from the old onboarding flow apart from being embedded in this screen).
+- Once claimed, the device's session (in `localStorage`, same as any Supabase session) *is* the login -- there's no sign-out anywhere in the UI. Resetting a device to unclaimed (e.g. it was set up for the wrong person) is a manual `update family_members set auth_user_id = null where id = '...'` -- there's no UI path for it, by design, since exposing one risks someone accidentally un-claiming a real device.
+- There is exactly one row in `patients` for the whole deployment (see spec §2 non-goals); `AuthContext` fetches it in parallel with the claim lookup. If `patients` is empty, `WhoAreYou` shows a static "ask whoever's setting up TakeCare" message instead of a form -- always make sure a patient row exists before testing auth end to end.
+
+Two RLS consequences worth knowing: `family_members` is `select`-able by any authenticated (including not-yet-claimed anonymous) session with `using (true)` -- needed so the picker can show names before the viewer has claimed anything; this is a deliberate, low-sensitivity exposure (names/relationships only) matching what `patients_select_authenticated` already did. And claiming and self-editing are two separate `UPDATE` policies (`family_members_claim`: `using (auth_user_id is null)`; `family_members_update_self`: `using (auth_user_id = auth.uid())`) rather than one policy trying to cover both — Postgres RLS lets multiple permissive policies on the same command coexist and OR's their `USING`/`WITH CHECK` clauses, which is simpler here than one combined condition.
+
+Anywhere the app names "other family members" to explain who got notified (`Home`'s mark-taken toast, `MedicinesAdmin`'s low-stock nudge), it filters to `auth_user_id is not null` -- an unclaimed placeholder can't have a push subscription, so it can't have actually been notified.
 
 ### The migration adds two things the spec never actually created
 
@@ -33,7 +42,7 @@ There is exactly one row in `patients` for the whole deployment (see spec §2 no
 
 The same migration also adds a `my_patient_id()` SQL function (`SECURITY DEFINER`) that every RLS policy calls to resolve "the patient this user belongs to." It's `SECURITY DEFINER` specifically to read `family_members` without recursing through that table's own RLS policy (which itself calls `my_patient_id()`).
 
-Later migrations: `0003` tightened the missed-dose check from a 30-min grace period / 15-min sweep to a 15-min grace period / 5-min sweep (both matter together — a short grace period masked by an infrequent sweep buys nothing). `0004` added `family_members.relationship` for the onboarding flow above.
+Later migrations: `0003` tightened the missed-dose check from a 30-min grace period / 15-min sweep to a 15-min grace period / 5-min sweep (both matter together — a short grace period masked by an infrequent sweep buys nothing). `0004` added `family_members.relationship`. `0005` added `medicines.notes` (optional, shown on both the Medicines list and today's dose card). `0006` replaced email auth with the anonymous-sign-in "pick your name" flow described above, and unclaimed every row that existed under the old flow (names/relationships preserved) since their `auth_user_id`s pointed at email identities that no longer mean anything.
 
 ### RLS: client never mutates `intake_logs` directly
 
@@ -88,6 +97,6 @@ Every dose-time display (`src/lib/format.ts`'s `formatTime`, and the push-notifi
 - Supabase project ref: `ovbnrofebdfkoabemkvg` (linked via `supabase link`).
 - Vercel project: `jhonsfranky17s-projects/takecare`, production URL `https://takecare-steel.vercel.app`.
 - GitHub remote: `origin` → `git@github.com:jhonsfranky17/TakeCare.git`. Nothing has been pushed there yet as of this writing — the repo has commits pending, not yet made.
-- Supabase Auth `site_url`/`additional_redirect_urls` are set to the Vercel production URL (plus `localhost:5199` for local dev) — magic-link emails redirect based on this, not on `emailRedirectTo` alone, since Supabase falls back to the allow-listed default if the requested redirect isn't in the list.
+- Supabase Auth's `site_url`/`additional_redirect_urls`/email-related settings (rate limits, SMTP) are leftover from the removed email flow and no longer affect anything the app does — `enable_anonymous_sign_ins = true` is the only auth setting the current flow depends on.
 
 **Careful with `supabase config push`**: it pushes the *entire* `supabase/config.toml`, not just the field you changed. The file still carries several `supabase init` local-dev defaults (shorter email rate limits, disabled email confirmation, disabled MFA, etc.) that are *not* what's live in production — always run `supabase config diff` first and check every field it would change, not just the one you intended.

@@ -18,6 +18,7 @@ interface RawDoseRow {
 
 const RANGES = ["This week", "This month", "All"] as const;
 type Range = (typeof RANGES)[number];
+const DAYS_PER_PAGE = 5;
 
 function ninetyDaysAgoIso(): string {
   const d = new Date();
@@ -91,6 +92,8 @@ export function History(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("This week");
+  const [query, setQuery] = useState<string>("");
+  const [page, setPage] = useState<number>(0);
 
   useEffect(() => {
     async function load(): Promise<void> {
@@ -121,7 +124,21 @@ export function History(): JSX.Element {
     () => doses.filter((d) => withinRange(new Date(d.scheduled_time), range)),
     [doses, range]
   );
+  // Day summaries ("5 of 5 taken") always reflect the full day, regardless
+  // of search -- search only narrows which rows are shown, not adherence.
   const days = useMemo(() => groupByDay(filtered), [filtered]);
+
+  const searchedDays = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return days;
+    return days
+      .map((day) => ({ ...day, rows: day.rows.filter((r) => r.name.toLowerCase().includes(q)) }))
+      .filter((day) => day.rows.length > 0);
+  }, [days, query]);
+
+  const pageCount = Math.max(1, Math.ceil(searchedDays.length / DAYS_PER_PAGE));
+  const clampedPage = Math.min(page, pageCount - 1);
+  const pagedDays = searchedDays.slice(clampedPage * DAYS_PER_PAGE, clampedPage * DAYS_PER_PAGE + DAYS_PER_PAGE);
 
   const onTrackDays = days.filter((d) => d.rows.every((r) => r.taken)).length;
   const headline =
@@ -149,7 +166,10 @@ export function History(): JSX.Element {
             <button
               key={r}
               type="button"
-              onClick={() => setRange(r)}
+              onClick={() => {
+                setRange(r);
+                setPage(0);
+              }}
               style={{
                 border: "none",
                 cursor: "pointer",
@@ -168,10 +188,38 @@ export function History(): JSX.Element {
         })}
       </div>
 
+      {days.length > 0 && (
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Search by medicine…"
+          aria-label="Search history"
+          style={{
+            height: 48,
+            borderRadius: 16,
+            border: "1.5px solid var(--tc-line)",
+            background: "var(--tc-card)",
+            padding: "0 16px",
+            fontFamily: "var(--tc-font)",
+            fontSize: 15,
+            fontWeight: 500,
+            color: "var(--tc-ink)",
+            outline: "none",
+          }}
+        />
+      )}
+
       {days.length === 0 ? (
         <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>No history in this range yet.</div>
+      ) : searchedDays.length === 0 ? (
+        <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
+          No history matches &ldquo;{query}&rdquo; in this range.
+        </div>
       ) : (
-        days.map((day) => (
+        pagedDays.map((day) => (
           <div key={day.id} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>{day.label}</div>
@@ -246,6 +294,52 @@ export function History(): JSX.Element {
             </div>
           </div>
         ))
+      )}
+
+      {pageCount > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={clampedPage === 0}
+            style={{
+              minHeight: "var(--tc-tap-min)",
+              minWidth: "var(--tc-tap-min)",
+              border: "none",
+              borderRadius: "var(--tc-r-badge)",
+              background: "var(--tc-pill)",
+              color: clampedPage === 0 ? "var(--tc-line)" : "var(--tc-ink-muted)",
+              fontFamily: "var(--tc-font)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: clampedPage === 0 ? "default" : "pointer",
+            }}
+          >
+            Prev
+          </button>
+          <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--tc-ink-muted)" }}>
+            Page {clampedPage + 1} of {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={clampedPage >= pageCount - 1}
+            style={{
+              minHeight: "var(--tc-tap-min)",
+              minWidth: "var(--tc-tap-min)",
+              border: "none",
+              borderRadius: "var(--tc-r-badge)",
+              background: "var(--tc-pill)",
+              color: clampedPage >= pageCount - 1 ? "var(--tc-line)" : "var(--tc-ink-muted)",
+              fontFamily: "var(--tc-font)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: clampedPage >= pageCount - 1 ? "default" : "pointer",
+            }}
+          >
+            Next
+          </button>
+        </div>
       )}
     </div>
   );
