@@ -1,10 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { Button } from "../ui/Button";
 import { TakeCareLogo } from "../TakeCareLogo";
-import { initialsOf } from "../lib/format";
 
-const field = {
+const selectField = {
   height: 56,
   borderRadius: 16,
   border: "1.5px solid var(--tc-line)",
@@ -17,19 +16,17 @@ const field = {
   outline: "none",
 } as const;
 
-const labelStyle = { fontSize: 13.5, fontWeight: 600, color: "var(--tc-ink-muted)" } as const;
-
 /**
  * The app's entry screen -- shown once per device, right after the silent
  * anonymous sign-in, until this device claims a family_members row. No
- * email, no password, no link to click: tap your name (or add yourself if
- * you're not listed yet) and this device remembers you from then on.
+ * email, no password, no typing your own name (that used to let two devices
+ * create the same person twice) -- pick yourself from the list a family
+ * member has already added on the Family screen, and this device remembers
+ * you from then on.
  */
 export function WhoAreYou(): JSX.Element {
-  const { patient, unclaimedMembers, claimFamilyMember, completeOnboarding } = useAuth();
-  const [adding, setAdding] = useState(unclaimedMembers.length === 0);
-  const [name, setName] = useState("");
-  const [relationship, setRelationship] = useState("");
+  const { patient, unclaimedMembers, claimFamilyMember } = useAuth();
+  const [selectedId, setSelectedId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,25 +50,12 @@ export function WhoAreYou(): JSX.Element {
     );
   }
 
-  const handleClaim = async (id: string): Promise<void> => {
+  const handleContinue = async (): Promise<void> => {
+    if (!selectedId) return;
     setSubmitting(true);
     setError(null);
     try {
-      await claimFamilyMember(id);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setSubmitting(false);
-    }
-  };
-
-  const handleAdd = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    if (!name.trim() || !relationship.trim()) return;
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      await completeOnboarding(name.trim(), relationship.trim());
+      await claimFamilyMember(selectedId);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setSubmitting(false);
@@ -107,110 +91,51 @@ export function WhoAreYou(): JSX.Element {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: "var(--tc-fs-title)", fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1.15 }}>
-            {adding ? "Welcome to the family" : "Who's this?"}
+            Who's this?
           </div>
           <div style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.5, color: "var(--tc-ink-muted)", maxWidth: 300 }}>
-            {adding
-              ? `A couple of details so ${patient.name} and everyone else know who you are.`
-              : `Tap your name to start getting ${patient.name}'s dose updates on this device.`}
+            Choose your name to start getting {patient.name}&rsquo;s dose updates on this device.
           </div>
         </div>
       </div>
 
-      {!adding && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {unclaimedMembers.map((member) => (
-            <button
-              key={member.id}
-              type="button"
-              disabled={submitting}
-              onClick={() => void handleClaim(member.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                background: "var(--tc-card)",
-                border: "1.5px solid var(--tc-line)",
-                borderRadius: "var(--tc-r-card)",
-                padding: "14px 16px",
-                fontFamily: "var(--tc-font)",
-                cursor: submitting ? "default" : "pointer",
-                textAlign: "left",
-              }}
-            >
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 16,
-                  flex: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  fontWeight: 600,
-                  background: "var(--tc-pill)",
-                  color: "var(--tc-ok-ink)",
-                }}
-              >
-                {initialsOf(member.name)}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ fontSize: 17, fontWeight: 600 }}>{member.name}</div>
-                {member.relationship && (
-                  <div style={{ fontSize: 13.5, color: "var(--tc-ink-muted)" }}>{member.relationship}</div>
-                )}
-              </div>
-            </button>
-          ))}
+      {unclaimedMembers.length === 0 ? (
+        <div
+          style={{
+            fontSize: 14.5,
+            lineHeight: 1.6,
+            color: "var(--tc-ink-muted)",
+            background: "var(--tc-pill)",
+            borderRadius: 16,
+            padding: "16px 18px",
+          }}
+        >
+          Everyone&rsquo;s already been added. Ask a family member to add you from their Family tab, then
+          reload this page.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            aria-label="Your name"
+            style={selectField}
+          >
+            <option value="" disabled>
+              Select your name…
+            </option>
+            {unclaimedMembers.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+                {member.relationship ? ` (${member.relationship})` : ""}
+              </option>
+            ))}
+          </select>
 
-          <Button variant="quiet" style={{ alignSelf: "center" }} onClick={() => setAdding(true)}>
-            Not listed? Add yourself
+          <Button variant="primary" disabled={!selectedId || submitting} onClick={() => void handleContinue()}>
+            {submitting ? "Saving…" : "This is me"}
           </Button>
         </div>
-      )}
-
-      {adding && (
-        <form onSubmit={(e) => void handleAdd(e)} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            <label htmlFor="tc-onboard-name" style={labelStyle}>
-              Your name
-            </label>
-            <input
-              id="tc-onboard-name"
-              required
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Priya"
-              style={field}
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            <label htmlFor="tc-onboard-relationship" style={labelStyle}>
-              Your relationship to {patient.name}
-            </label>
-            <input
-              id="tc-onboard-relationship"
-              required
-              value={relationship}
-              onChange={(e) => setRelationship(e.target.value)}
-              placeholder="e.g. Daughter, Son, Caregiver"
-              style={field}
-            />
-          </div>
-
-          <Button variant="primary" type="submit" disabled={submitting} style={{ marginTop: 4 }}>
-            {submitting ? "Saving…" : "Continue"}
-          </Button>
-
-          {unclaimedMembers.length > 0 && (
-            <Button variant="quiet" style={{ alignSelf: "center" }} onClick={() => setAdding(false)}>
-              Back to the list
-            </Button>
-          )}
-        </form>
       )}
 
       {error && (

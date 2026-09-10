@@ -11,6 +11,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="TakeCare" />
     <title>TakeCare</title>
+    <script>
+      // Stamp a stored light/dark override onto <html> before first paint,
+      // so the splash below (and tokens.css, once it loads) pick the right
+      // theme immediately instead of flashing system-default then correcting.
+      // Reads the same key src/lib/theme.ts writes -- keep both in sync.
+      try {
+        var tcTheme = localStorage.getItem("tc-theme");
+        if (tcTheme === "light" || tcTheme === "dark") {
+          document.documentElement.setAttribute("data-theme", tcTheme);
+        }
+      } catch (e) {}
+    </script>
     <style>
       /* Pre-JS splash background -- can't use tokens.css here since that
          loads as part of the JS bundle; kept in sync with --tc-bg by hand. */
@@ -24,9 +36,15 @@
         background: #fbfcf7;
       }
       @media (prefers-color-scheme: dark) {
-        #tc-splash {
+        html:not([data-theme="light"]) #tc-splash {
           background: #12160e;
         }
+      }
+      html[data-theme="dark"] #tc-splash {
+        background: #12160e;
+      }
+      html[data-theme="light"] #tc-splash {
+        background: #fbfcf7;
       }
     </style>
   </head>

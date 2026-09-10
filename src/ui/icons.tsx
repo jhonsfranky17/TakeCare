@@ -37,3 +37,17 @@ export const InfoIcon = ({ size = 20, ...rest }: IconProps) => (
     <circle cx={12} cy={16.6} r={1.2} fill="currentColor" />
   </svg>
 );
+export const SunIcon = ({ size = 20, ...rest }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden {...rest}>
+    <circle cx={12} cy={12} r={4.5} stroke="currentColor" strokeWidth={2} />
+    <path
+      d="M12 2v2.5M12 19.5V22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2 12h2.5M19.5 12H22M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"
+      stroke="currentColor" strokeWidth={2} strokeLinecap="round"
+    />
+  </svg>
+);
+export const MoonIcon = ({ size = 20, ...rest }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden {...rest}>
+    <path d="M20 14.5A8.5 8.5 0 119.5 4a6.5 6.5 0 0010.5 10.5z" fill="currentColor" />
+  </svg>
+);

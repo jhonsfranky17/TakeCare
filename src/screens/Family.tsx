@@ -5,6 +5,7 @@ import { initialsOf } from "../lib/format";
 import { Button } from "../ui/Button";
 import { Toast } from "../ui/Toast";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ThemeToggle } from "../components/ThemeToggle";
 import type { FamilyMember } from "../lib/types";
 
 const field = {
@@ -245,6 +246,21 @@ export function Family(): JSX.Element {
         <Button variant="quiet" style={{ alignSelf: "center" }} onClick={() => void handleInvite()}>
           or just share the app link
         </Button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: "0.9px",
+            textTransform: "uppercase",
+            color: "var(--tc-ink-muted)",
+          }}
+        >
+          Appearance
+        </div>
+        <ThemeToggle />
       </div>
 
       {toast && <Toast message={toast} />}

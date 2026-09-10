@@ -2,6 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles/tokens.css";
+import { initTheme } from "./lib/theme";
+
+// Before the first render, so a stored light/dark override applies from the
+// very first paint -- index.html's inline script does the same for the
+// static splash, which paints even earlier than this module runs at all.
+initTheme();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

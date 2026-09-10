@@ -16,11 +16,10 @@ interface AuthState {
   unclaimedMembers: FamilyMember[];
   loading: boolean;
   // Claims an existing, unclaimed family_members row as this device's
-  // identity (the "who are you?" picker).
+  // identity (the "who are you?" dropdown). New people are added ahead of
+  // time from the Family screen, by name -- not from this screen -- so two
+  // devices can never race to create the same person twice.
   claimFamilyMember: (id: string) => Promise<void>;
-  // Creates a brand-new family_members row and claims it in one step (the
-  // "not listed? add yourself" path, and Family screen's "add someone").
-  completeOnboarding: (name: string, relationship: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -112,27 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     setUnclaimedMembers((prev) => prev.filter((m) => m.id !== id));
   };
 
-  const completeOnboarding = async (name: string, relationship: string): Promise<void> => {
-    if (!session || !patient) {
-      throw new Error("Cannot complete onboarding without a session and patient");
-    }
-    const { data: created, error } = await supabase
-      .from("family_members")
-      .insert({
-        patient_id: patient.id,
-        name,
-        relationship,
-        auth_user_id: session.user.id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-    setFamilyMember(created);
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -142,7 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         unclaimedMembers,
         loading,
         claimFamilyMember,
-        completeOnboarding,
       }}
     >
       {children}
