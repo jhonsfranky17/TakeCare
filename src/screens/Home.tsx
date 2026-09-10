@@ -345,8 +345,9 @@ export function Home(): JSX.Element {
             <DoseCard
               key={dose.id}
               dose={toViewDose(dose)}
+              marking={markingId === dose.id}
               onMarkTaken={(id) => void handleMarkTaken(id)}
-              onUndo={(id) => void handleUndo(id)}
+              onUndo={handleUndo}
             />
           ))}
         </div>

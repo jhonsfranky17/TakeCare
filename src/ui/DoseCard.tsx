@@ -1,7 +1,8 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Dose, DoseStatus } from "./viewTypes";
 import { Button } from "./Button";
 import { StatusBadge } from "./StatusBadge";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { CheckIcon, ClockIcon } from "./icons";
 
 const surface: Record<DoseStatus, CSSProperties> = {
@@ -25,13 +26,23 @@ const iconTint: Record<DoseStatus, string> = {
 
 export function DoseCard({
   dose,
+  marking = false,
   onMarkTaken,
   onUndo,
 }: {
   dose: Dose;
+  // True while this specific dose's mark-taken/log-it-anyway request is in
+  // flight -- disables the button and swaps its label so a slow connection
+  // doesn't look like the tap did nothing.
+  marking?: boolean;
   onMarkTaken: (id: string) => void;
-  onUndo: (id: string) => void;
+  // Returns a Promise (not fire-and-forget) so the confirm dialog below can
+  // show its own busy state for the duration of the undo request.
+  onUndo: (id: string) => Promise<void>;
 }) {
+  const [confirmingUndo, setConfirmingUndo] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+
   const card: CSSProperties = {
     borderRadius: 24,
     padding: 18,
@@ -53,6 +64,14 @@ export function DoseCard({
     background:
       dose.status === "pending" ? "var(--tc-pill)" : "rgba(255, 255, 255, 0.6)",
     color: iconTint[dose.status],
+  };
+
+  const handleConfirmUndo = async (): Promise<void> => {
+    setUndoing(true);
+    await onUndo(dose.id);
+    // No `finally`-style reset needed: a successful undo flips dose.status
+    // away from "taken" via the parent's refetch, which unmounts this
+    // branch (and the dialog with it) entirely.
   };
 
   return (
@@ -118,9 +137,9 @@ export function DoseCard({
         // already puts taken at that height and pending's 40px button alone
         // would otherwise sit a few px shorter.
         <div style={{ minHeight: "var(--tc-tap-min)", display: "flex", alignItems: "center" }}>
-          <Button variant="primary" onClick={() => onMarkTaken(dose.id)}>
+          <Button variant="primary" disabled={marking} onClick={() => onMarkTaken(dose.id)}>
             <CheckIcon size={20} />
-            Mark as Taken
+            {marking ? "Logging…" : "Mark as Taken"}
           </Button>
         </div>
       )}
@@ -147,7 +166,7 @@ export function DoseCard({
               ? "Marked as taken just now"
               : "Taken at " + dose.takenAt}
           </div>
-          <Button variant="quiet" onClick={() => onUndo(dose.id)}>
+          <Button variant="quiet" onClick={() => setConfirmingUndo(true)}>
             Undo
           </Button>
         </div>
@@ -166,10 +185,21 @@ export function DoseCard({
             This one slipped by. No harm done — you can still log it, or skip it
             if you&rsquo;d rather.
           </div>
-          <Button variant="recovery" onClick={() => onMarkTaken(dose.id)}>
-            Log it now anyway
+          <Button variant="recovery" disabled={marking} onClick={() => onMarkTaken(dose.id)}>
+            {marking ? "Logging…" : "Log it now anyway"}
           </Button>
         </div>
+      )}
+
+      {confirmingUndo && (
+        <ConfirmDialog
+          title="Undo this dose?"
+          message={`This puts ${dose.medicineName} back to pending -- you can mark it taken again anytime.`}
+          confirmLabel="Yes, undo"
+          busy={undoing}
+          onConfirm={() => void handleConfirmUndo()}
+          onCancel={() => setConfirmingUndo(false)}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
 import { sortTimes12h, to12h, to24h } from "../lib/format";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import type { Medicine } from "../lib/types";
 
 const field = {
@@ -54,6 +55,7 @@ export function AddMedicineSheet({
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [addingTime, setAddingTime] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async (): Promise<void> => {
@@ -350,12 +352,23 @@ export function AddMedicineSheet({
             variant="quiet"
             style={{ alignSelf: "center" }}
             disabled={saving}
-            onClick={() => void handleRemove()}
+            onClick={() => setConfirmingRemove(true)}
           >
             Remove medicine
           </Button>
         )}
       </div>
+
+      {confirmingRemove && editing && (
+        <ConfirmDialog
+          title={`Remove ${editing.name}?`}
+          message="This can't be undone -- it stops future doses being scheduled and clears its history too."
+          confirmLabel="Yes, remove it"
+          busy={saving}
+          onConfirm={() => void handleRemove()}
+          onCancel={() => setConfirmingRemove(false)}
+        />
+      )}
     </div>
   );
 }

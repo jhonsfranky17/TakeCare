@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { daysRemaining, joinNames, joinTimes, runsOutLabel, timeOfDayFromHHMM, to12h } from "../lib/format";
+import { daysRemaining, isLowStock, joinNames, joinTimes, runsOutLabel, timeOfDayFromHHMM, to12h } from "../lib/format";
 import { LowStockNudge, StockBar } from "../ui/StockBar";
 import { PillIcon } from "../ui/icons";
 import { AddMedicineSheet } from "./AddMedicineSheet";
@@ -11,9 +11,12 @@ import type { ViewMedicine } from "../ui/viewTypes";
 
 const PAGE_SIZE = 5;
 
+function medicineIsLow(m: Medicine): boolean {
+  return isLowStock(m.current_stock, m.dosage_per_intake, m.times_per_day.length, m.refill_threshold_days);
+}
+
 function toViewMedicine(m: Medicine): ViewMedicine {
   const remaining = daysRemaining(m.current_stock, m.dosage_per_intake, m.times_per_day.length);
-  const low = remaining <= m.refill_threshold_days;
   const dailyDoses = m.dosage_per_intake * m.times_per_day.length;
   return {
     id: m.id,
@@ -23,7 +26,7 @@ function toViewMedicine(m: Medicine): ViewMedicine {
     stockCount: m.current_stock,
     stockCapacity: Math.max(m.refill_threshold_days * dailyDoses * 3, m.current_stock, 1),
     runsOut: runsOutLabel(remaining),
-    low,
+    low: medicineIsLow(m),
     notes: m.notes,
   };
 }
@@ -36,6 +39,7 @@ export function MedicinesAdmin(): JSX.Element {
   const [sheetFor, setSheetFor] = useState<Medicine | "new" | null>(null);
   const [query, setQuery] = useState<string>("");
   const [timeFilter, setTimeFilter] = useState<TimeFilterLabel>("All");
+  const [lowOnly, setLowOnly] = useState<boolean>(false);
   const [page, setPage] = useState<number>(0);
 
   const loadMedicines = async (): Promise<void> => {
@@ -70,23 +74,33 @@ export function MedicinesAdmin(): JSX.Element {
       if (timeFilter !== "All" && !m.times_per_day.some((t) => timeFilterMatches(timeOfDayFromHHMM(t), timeFilter))) {
         return false;
       }
+      if (lowOnly && !medicineIsLow(m)) return false;
       return true;
     });
-  }, [medicines, query, timeFilter]);
+  }, [medicines, query, timeFilter, lowOnly]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const clampedPage = Math.min(page, pageCount - 1);
   const paged = filtered.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
   const viewMedicines = paged.map(toViewMedicine);
-  const lowCount = medicines.filter((m) => {
-    const remaining = daysRemaining(m.current_stock, m.dosage_per_intake, m.times_per_day.length);
-    return remaining <= m.refill_threshold_days;
-  }).length;
+  const lowCount = medicines.filter(medicineIsLow).length;
   const recipient = joinNames(otherNames) || "the family";
 
   if (loading) {
     return <LoadingScreen />;
   }
+
+  const emptyMessage = ((): string => {
+    if (medicines.length === 0) return "No medicines added yet.";
+    const clauses: string[] = [];
+    if (timeFilter !== "All") clauses.push(`in the ${timeFilter.toLowerCase()}`);
+    if (lowOnly) clauses.push("that need a refill");
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      return `No medicines match “${trimmedQuery}”${clauses.length ? ` ${clauses.join(" ")}` : ""}.`;
+    }
+    return clauses.length ? `No medicines ${clauses.join(" ")}.` : "No medicines match your filters.";
+  })();
 
   return (
     <div style={{ padding: "62px 20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -158,16 +172,34 @@ export function MedicinesAdmin(): JSX.Element {
         />
       )}
 
+      {lowCount > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setLowOnly((v) => !v);
+            setPage(0);
+          }}
+          style={{
+            alignSelf: "flex-start",
+            cursor: "pointer",
+            fontFamily: "var(--tc-font)",
+            padding: "9px 15px",
+            borderRadius: "var(--tc-r-badge)",
+            border: lowOnly ? "1.5px solid var(--tc-warn-line)" : "1.5px solid transparent",
+            background: lowOnly ? "var(--tc-warn-bg)" : "var(--tc-pill)",
+            color: lowOnly ? "var(--tc-warn-ink)" : "var(--tc-ink-muted)",
+            fontSize: 13.5,
+            fontWeight: lowOnly ? 600 : 500,
+          }}
+        >
+          Needs refill{lowOnly ? "" : ` (${lowCount})`}
+        </button>
+      )}
+
       {error && <div style={{ fontSize: 13.5, color: "var(--tc-warn-ink)" }}>{error}</div>}
 
       {filtered.length === 0 ? (
-        <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
-          {medicines.length === 0
-            ? "No medicines added yet."
-            : query.trim()
-              ? `No medicines match “${query}”${timeFilter === "All" ? "" : ` in the ${timeFilter.toLowerCase()}`}.`
-              : `No medicines in the ${timeFilter.toLowerCase()}.`}
-        </div>
+        <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>{emptyMessage}</div>
       ) : (
         paged.map((medicine, i) => {
           const view = viewMedicines[i];

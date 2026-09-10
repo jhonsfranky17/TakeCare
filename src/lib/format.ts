@@ -66,6 +66,18 @@ export function daysRemaining(currentStock: number, dosagePerIntake: number, tim
   return Math.floor(currentStock / dailyDoses);
 }
 
+// Same threshold check used three separate places in MedicinesAdmin
+// (the view-model, the header's "N need a refill soon" count, and the
+// low-stock filter) -- centralized so all three always agree.
+export function isLowStock(
+  currentStock: number,
+  dosagePerIntake: number,
+  timesPerDayCount: number,
+  refillThresholdDays: number,
+): boolean {
+  return daysRemaining(currentStock, dosagePerIntake, timesPerDayCount) <= refillThresholdDays;
+}
+
 export function runsOutLabel(days: number): string {
   if (days <= 0) return "out of stock";
   if (days === 1) return "runs out tomorrow";
