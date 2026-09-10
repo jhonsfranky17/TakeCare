@@ -19,6 +19,7 @@ export const CheckIcon = (p: IconProps) => <Stroke {...p} paths={['M5 12.6l4.2 4
 export const ClockIcon = (p: IconProps) => <Stroke {...p} paths={['M12 7.4V12l3 1.8', 'M12 21a9 9 0 100-18 9 9 0 000 18']} />;
 export const HomeIcon = (p: IconProps) => <Stroke {...p} paths={['M4 10.6L12 4l8 6.6V20h-5v-5.4H9V20H4v-9.4z']} />;
 export const PillIcon = (p: IconProps) => <Stroke {...p} paths={['M14.8 4.6a4.6 4.6 0 016.6 6.5l-9.9 9.9A4.6 4.6 0 012.9 14.5l9.9-9.9z', 'M8.4 8.9l6.7 6.7']} />;
+export const ChevronDownIcon = (p: IconProps) => <Stroke {...p} paths={['M6 9l6 6 6-6']} strokeW={2.2} />;
 export const FamilyIcon = (p: IconProps) => (
   <Stroke
     {...p}

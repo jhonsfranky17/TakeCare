@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
+import { unsubscribeFromPush } from "./push";
 import type { FamilyMember, Patient } from "./types";
 
 interface AuthState {
@@ -20,6 +21,11 @@ interface AuthState {
   // time from the Family screen, by name -- not from this screen -- so two
   // devices can never race to create the same person twice.
   claimFamilyMember: (id: string) => Promise<void>;
+  // Releases this device's claim (auth_user_id back to null) rather than
+  // deleting the row -- there's no email/password to log back in with, so
+  // "logging back in" is re-picking this same row from the dropdown. That's
+  // what keeps logout from ever producing a duplicate entry.
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -111,6 +117,26 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     setUnclaimedMembers((prev) => prev.filter((m) => m.id !== id));
   };
 
+  const logout = async (): Promise<void> => {
+    if (!familyMember) return;
+    const releasing = familyMember;
+
+    // Order matters: push_subscriptions_delete's RLS still requires this
+    // device to be the claimed owner, so clean those up before releasing.
+    await unsubscribeFromPush(releasing.id);
+
+    const { error } = await supabase
+      .from("family_members")
+      .update({ auth_user_id: null })
+      .eq("id", releasing.id);
+
+    if (error) {
+      throw error;
+    }
+    setFamilyMember(null);
+    setUnclaimedMembers((prev) => [...prev, { ...releasing, auth_user_id: null }]);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -120,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         unclaimedMembers,
         loading,
         claimFamilyMember,
+        logout,
       }}
     >
       {children}

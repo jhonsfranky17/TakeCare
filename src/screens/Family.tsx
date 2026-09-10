@@ -22,7 +22,7 @@ const field = {
 } as const;
 
 export function Family(): JSX.Element {
-  const { patient, familyMember } = useAuth();
+  const { patient, familyMember, logout } = useAuth();
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +30,7 @@ export function Family(): JSX.Element {
   const [addingName, setAddingName] = useState("");
   const [addingRelationship, setAddingRelationship] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const loadMembers = async (): Promise<void> => {
     const { data, error: fetchError } = await supabase
@@ -80,6 +81,20 @@ export function Family(): JSX.Element {
     setAddingName("");
     setAddingRelationship("");
     await loadMembers();
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    setLoggingOut(true);
+    setError(null);
+    try {
+      // On success, familyMember becomes null and App.tsx's RequireAuth
+      // swaps this whole screen for the WhoAreYou picker -- nothing further
+      // to do here. Only a thrown error leaves this component mounted.
+      await logout();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoggingOut(false);
+    }
   };
 
   if (loading) {
@@ -262,6 +277,41 @@ export function Family(): JSX.Element {
         </div>
         <ThemeToggle />
       </div>
+
+      {familyMember && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: "0.9px",
+              textTransform: "uppercase",
+              color: "var(--tc-ink-muted)",
+            }}
+          >
+            Account
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              border: "1px solid var(--tc-line)",
+              borderRadius: "var(--tc-r-card)",
+              padding: "16px 18px",
+              background: "var(--tc-card)",
+            }}
+          >
+            <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--tc-ink-muted)" }}>
+              Signed in as <strong style={{ color: "var(--tc-ink)" }}>{familyMember.name}</strong> on this
+              device.
+            </div>
+            <Button variant="quiet" disabled={loggingOut} onClick={() => void handleLogout()}>
+              {loggingOut ? "Logging out…" : "Log out"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast} />}
     </div>

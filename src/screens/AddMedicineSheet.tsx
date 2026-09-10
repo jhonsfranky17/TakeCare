@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
-import { to12h, to24h } from "../lib/format";
+import { sortTimes12h, to12h, to24h } from "../lib/format";
 import { Button } from "../ui/Button";
 import type { Medicine } from "../lib/types";
 
@@ -45,7 +45,11 @@ export function AddMedicineSheet({
     editing ? String(editing.current_stock) : "",
   );
   const [times, setTimes] = useState<string[]>(
-    editing ? editing.times_per_day.map(to12h) : ["8:00 AM", "9:00 PM"],
+    // Sorted on load too -- a medicine saved before this fix (or with times
+    // ever stored out of order some other way) should still display in
+    // order the first time this sheet opens for it, not just after the next
+    // edit.
+    sortTimes12h(editing ? editing.times_per_day.map(to12h) : ["8:00 AM", "9:00 PM"]),
   );
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [addingTime, setAddingTime] = useState(false);
@@ -275,7 +279,7 @@ export function AddMedicineSheet({
                   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
                   const display = `${hour12}:${m} ${period}`;
                   setTimes((prev) =>
-                    prev.includes(display) ? prev : [...prev, display],
+                    prev.includes(display) ? prev : sortTimes12h([...prev, display]),
                   );
                   setAddingTime(false);
                 }}
@@ -334,7 +338,7 @@ export function AddMedicineSheet({
 
         <Button
           variant="primary"
-          style={{ height: 60, fontSize: 18, fontWeight: 600, marginTop: 4 }}
+          style={{ marginTop: 4 }}
           disabled={saving || !name.trim() || times.length === 0}
           onClick={() => void handleSave()}
         >

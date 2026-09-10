@@ -111,7 +111,7 @@ export function Home(): JSX.Element {
       .then((result) => {
         if (result.status === "denied") {
           setPushStatus(
-            "Notifications are off - enable them in your browser settings to get alerts.",
+            "Notifications are off, enable them in your browser settings to get alerts.",
           );
         } else if (result.status === "unsupported") {
           setPushStatus("This browser doesn't support push notifications.");

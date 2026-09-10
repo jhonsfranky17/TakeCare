@@ -33,8 +33,8 @@ export function NavBar(): JSX.Element {
           style={({ isActive }) => ({
             border: "none",
             cursor: "pointer",
-            minHeight: 56,
-            padding: "6px 0",
+            minHeight: 52,
+            padding: "5px 0",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -49,7 +49,7 @@ export function NavBar(): JSX.Element {
         >
           {({ isActive }) => (
             <>
-              <Icon size={23} />
+              <Icon size={21} />
               <span
                 style={{
                   fontSize: "var(--tc-fs-tab)",

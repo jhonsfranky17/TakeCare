@@ -66,3 +66,26 @@ export async function subscribeToPush(
 
   return { status: "subscribed" };
 }
+
+// Called on logout so a released family_members row doesn't keep pushing
+// to the device that just gave it up -- removes both the DB row and the
+// browser's own subscription (best-effort; a failure here shouldn't block
+// the logout itself).
+export async function unsubscribeFromPush(familyMemberId: string): Promise<void> {
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("family_member_id", familyMemberId);
+  if (error) {
+    console.error("failed to remove push subscription row:", error);
+  }
+
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    await existing?.unsubscribe();
+  } catch (err: unknown) {
+    console.error("failed to unsubscribe browser push manager:", err);
+  }
+}

@@ -1,28 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { Button } from "../ui/Button";
+import { Dropdown } from "../ui/Dropdown";
 import { TakeCareLogo } from "../TakeCareLogo";
-
-const selectField = {
-  height: 56,
-  borderRadius: 16,
-  border: "1.5px solid var(--tc-line)",
-  background: "var(--tc-card)",
-  padding: "0 16px",
-  fontFamily: "var(--tc-font)",
-  fontSize: 16,
-  fontWeight: 500,
-  color: "var(--tc-ink)",
-  outline: "none",
-} as const;
-
-// Belt-and-suspenders on top of tokens.css's color-scheme: some
-// browsers still don't fully theme a native <select>'s option popup from
-// color-scheme alone, so style each <option> explicitly too.
-const optionStyle = {
-  background: "var(--tc-card)",
-  color: "var(--tc-ink)",
-} as const;
 
 /**
  * The app's entry screen -- shown once per device, right after the silent
@@ -53,7 +33,8 @@ export function WhoAreYou(): JSX.Element {
           lineHeight: 1.6,
         }}
       >
-        This app isn&rsquo;t set up yet — ask whoever&rsquo;s setting up TakeCare to add the patient first.
+        This app isn&rsquo;t set up yet, ask whoever&rsquo;s setting up TakeCare
+        to add the patient first.
       </div>
     );
   }
@@ -81,7 +62,14 @@ export function WhoAreYou(): JSX.Element {
         gap: 28,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: "flex-start" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 18,
+          alignItems: "flex-start",
+        }}
+      >
         <div
           style={{
             width: 56,
@@ -98,11 +86,26 @@ export function WhoAreYou(): JSX.Element {
           <TakeCareLogo size={32} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: "var(--tc-fs-title)", fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1.15 }}>
-            Who's this?
+          <div
+            style={{
+              fontSize: "var(--tc-fs-title)",
+              fontWeight: 700,
+              letterSpacing: "-0.5px",
+              lineHeight: 1.15,
+            }}
+          >
+            Glad you're here
           </div>
-          <div style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.5, color: "var(--tc-ink-muted)", maxWidth: 300 }}>
-            Choose your name to start getting {patient.name}&rsquo;s dose updates on this device.
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 400,
+              lineHeight: 1.5,
+              color: "var(--tc-ink-muted)",
+              maxWidth: 300,
+            }}
+          >
+            Pick your name to start getting updates on Dad's medicines.
           </div>
         </div>
       </div>
@@ -118,36 +121,42 @@ export function WhoAreYou(): JSX.Element {
             padding: "16px 18px",
           }}
         >
-          Everyone&rsquo;s already been added. Ask a family member to add you from their Family tab, then
-          reload this page.
+          Everyone&rsquo;s already been added. Ask a family member to add you
+          from their Family tab, then reload this page.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <select
+          <Dropdown
+            options={unclaimedMembers.map((member) => ({
+              value: member.id,
+              label: member.name,
+              sublabel: member.relationship ?? undefined,
+            }))}
             value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            aria-label="Your name"
-            style={selectField}
-          >
-            <option value="" disabled style={optionStyle}>
-              Select your name…
-            </option>
-            {unclaimedMembers.map((member) => (
-              <option key={member.id} value={member.id} style={optionStyle}>
-                {member.name}
-                {member.relationship ? ` (${member.relationship})` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedId}
+            placeholder="Select your name"
+            ariaLabel="Your name"
+          />
 
-          <Button variant="primary" disabled={!selectedId || submitting} onClick={() => void handleContinue()}>
-            {submitting ? "Saving…" : "This is me"}
+          <Button
+            variant="primary"
+            disabled={!selectedId || submitting}
+            onClick={() => void handleContinue()}
+          >
+            {submitting ? "Setting you up..." : "That's me!"}
           </Button>
         </div>
       )}
 
       {error && (
-        <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--tc-warn-ink)", textAlign: "center" }}>
+        <div
+          style={{
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            color: "var(--tc-warn-ink)",
+            textAlign: "center",
+          }}
+        >
           {error}
         </div>
       )}

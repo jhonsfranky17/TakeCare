@@ -46,8 +46,18 @@ export function to24h(display: string): string | null {
   return `${String(h).padStart(2, "0")}:${mStr}`;
 }
 
+// Chronological order (8:00 AM before 9:00 PM), not the order they were
+// picked/typed in -- used wherever a medicine's times are edited or shown,
+// so the schedule always reads left-to-right through the day.
+export function sortTimes12h(times12h: string[]): string[] {
+  return [...times12h].sort((a, b) => (to24h(a) ?? "").localeCompare(to24h(b) ?? ""));
+}
+
+// Always sorts -- times_per_day can predate this sort existing (rows saved
+// before the fix, or written directly via SQL), so display sorts
+// defensively rather than trusting stored order to already be chronological.
 export function joinTimes(times12h: string[]): string {
-  return joinNames(times12h);
+  return joinNames(sortTimes12h(times12h));
 }
 
 export function daysRemaining(currentStock: number, dosagePerIntake: number, timesPerDayCount: number): number {
