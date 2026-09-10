@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { daysRemaining, joinNames, joinTimes, runsOutLabel, to12h } from "../lib/format";
+import { daysRemaining, joinNames, joinTimes, runsOutLabel, timeOfDayFromHHMM, to12h } from "../lib/format";
 import { LowStockNudge, StockBar } from "../ui/StockBar";
 import { PillIcon } from "../ui/icons";
 import { AddMedicineSheet } from "./AddMedicineSheet";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { TimeFilterBar, timeFilterMatches, type TimeFilterLabel } from "../components/TimeFilterBar";
 import type { Medicine } from "../lib/types";
 import type { ViewMedicine } from "../ui/viewTypes";
 
@@ -34,6 +35,7 @@ export function MedicinesAdmin(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [sheetFor, setSheetFor] = useState<Medicine | "new" | null>(null);
   const [query, setQuery] = useState<string>("");
+  const [timeFilter, setTimeFilter] = useState<TimeFilterLabel>("All");
   const [page, setPage] = useState<number>(0);
 
   const loadMedicines = async (): Promise<void> => {
@@ -61,9 +63,16 @@ export function MedicinesAdmin(): JSX.Element {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return medicines;
-    return medicines.filter((m) => m.name.toLowerCase().includes(q));
-  }, [medicines, query]);
+    return medicines.filter((m) => {
+      if (q && !m.name.toLowerCase().includes(q)) return false;
+      // A medicine can have several times a day -- it matches a time-of-day
+      // filter if any one of them falls in that band, not only its first.
+      if (timeFilter !== "All" && !m.times_per_day.some((t) => timeFilterMatches(timeOfDayFromHHMM(t), timeFilter))) {
+        return false;
+      }
+      return true;
+    });
+  }, [medicines, query, timeFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const clampedPage = Math.min(page, pageCount - 1);
@@ -139,11 +148,25 @@ export function MedicinesAdmin(): JSX.Element {
         />
       )}
 
+      {medicines.length > 0 && (
+        <TimeFilterBar
+          value={timeFilter}
+          onChange={(f) => {
+            setTimeFilter(f);
+            setPage(0);
+          }}
+        />
+      )}
+
       {error && <div style={{ fontSize: 13.5, color: "var(--tc-warn-ink)" }}>{error}</div>}
 
       {filtered.length === 0 ? (
         <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
-          No medicines match &ldquo;{query}&rdquo;.
+          {medicines.length === 0
+            ? "No medicines added yet."
+            : query.trim()
+              ? `No medicines match “${query}”${timeFilter === "All" ? "" : ` in the ${timeFilter.toLowerCase()}`}.`
+              : `No medicines in the ${timeFilter.toLowerCase()}.`}
         </div>
       ) : (
         paged.map((medicine, i) => {

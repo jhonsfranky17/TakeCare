@@ -112,21 +112,32 @@ export function DoseCard({
       </div>
 
       {dose.status === "pending" && (
-        <Button variant="primary" onClick={() => onMarkTaken(dose.id)}>
-          <CheckIcon size={20} />
-          Mark as Taken
-        </Button>
+        // minHeight/centered wrapper, not just the button -- lines this
+        // row's total height up with taken's action row exactly (both end
+        // up var(--tc-tap-min) tall), since Undo's own tap-target floor
+        // already puts taken at that height and pending's 40px button alone
+        // would otherwise sit a few px shorter.
+        <div style={{ minHeight: "var(--tc-tap-min)", display: "flex", alignItems: "center" }}>
+          <Button variant="primary" onClick={() => onMarkTaken(dose.id)}>
+            <CheckIcon size={20} />
+            Mark as Taken
+          </Button>
+        </div>
       )}
 
       {dose.status === "taken" && (
+        // No border-top/padding-top divider (the approved design had one) --
+        // box-sizing:border-box means that 13px was added on top of Undo's
+        // already-48px tap-target floor, pushing this row past pending's
+        // height with nothing to trim. The card's own 14px gap above this
+        // row provides the same visual separation the divider did.
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
-            borderTop: "1px solid var(--tc-ok-line)",
-            paddingTop: 12,
+            minHeight: "var(--tc-tap-min)",
           }}
         >
           <div

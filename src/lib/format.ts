@@ -78,6 +78,29 @@ export function runsOutLabel(days: number): string {
   return `about ${days} days`;
 }
 
+export type TimeOfDay = "morning" | "afternoon" | "night";
+
+// Splits the day into three non-overlapping bands covering all 24 hours, so
+// a time-of-day filter never hides something because its time fell in a
+// gap. Shared by both time representations the app stores: ISO timestamps
+// (intake_logs.scheduled_time) and stored "HH:MM" strings (medicines.times_per_day).
+function bucketForHour(hour: number): TimeOfDay {
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "night";
+}
+
+// Same local-time convention formatTime() already uses (no explicit
+// timeZone -- relies on the viewing device's own clock).
+export function timeOfDay(iso: string): TimeOfDay {
+  return bucketForHour(new Date(iso).getHours());
+}
+
+// "08:00" (24h, as stored in medicines.times_per_day) -> its bucket.
+export function timeOfDayFromHHMM(hhmm: string): TimeOfDay {
+  return bucketForHour(Number(hhmm.split(":")[0]));
+}
+
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";

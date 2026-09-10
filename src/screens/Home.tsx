@@ -8,10 +8,12 @@ import {
   greeting,
   initialsOf,
   joinNames,
+  timeOfDay,
 } from "../lib/format";
 import { DoseCard } from "../ui/DoseCard";
 import { Toast } from "../ui/Toast";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { TimeFilterBar, timeFilterMatches, type TimeFilterLabel } from "../components/TimeFilterBar";
 import type { DoseWithMedicine, Medicine } from "../lib/types";
 import type { Dose } from "../ui/viewTypes";
 
@@ -65,6 +67,7 @@ export function Home(): JSX.Element {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<TimeFilterLabel>("All");
 
   const loadDoses = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -160,9 +163,14 @@ export function Home(): JSX.Element {
     return <LoadingScreen />;
   }
 
+  // Summary card always reflects the whole day -- the filter only narrows
+  // which dose cards are shown below it, same principle History's search
+  // uses for its day summaries (a filter that also changed the "2 of 5
+  // taken" count would misrepresent adherence, not just narrow a list).
   const taken = doses.filter((d) => d.status === "taken").length;
   const pending = doses.filter((d) => d.status === "pending").length;
   const missed = doses.filter((d) => d.status === "missed").length;
+  const filteredDoses = doses.filter((d) => timeFilterMatches(timeOfDay(d.scheduled_time), timeFilter));
   const dateLabel = new Date().toLocaleDateString([], {
     weekday: "long",
     day: "numeric",
@@ -321,13 +329,19 @@ export function Home(): JSX.Element {
         Today&rsquo;s doses
       </div>
 
+      {doses.length > 0 && <TimeFilterBar value={timeFilter} onChange={setTimeFilter} />}
+
       {doses.length === 0 ? (
         <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
           No doses scheduled for today yet.
         </div>
+      ) : filteredDoses.length === 0 ? (
+        <div style={{ fontSize: 14.5, color: "var(--tc-ink-muted)" }}>
+          No doses in the {timeFilter.toLowerCase()} today.
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {doses.map((dose) => (
+          {filteredDoses.map((dose) => (
             <DoseCard
               key={dose.id}
               dose={toViewDose(dose)}
