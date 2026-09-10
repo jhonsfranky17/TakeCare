@@ -1,5 +1,15 @@
 /* TakeCare design tokens — light is the default, dark via prefers-color-scheme or [data-theme="dark"] */
 :root {
+  /* Tells the browser which palette native controls (select dropdowns,
+     scrollbars, date pickers) should render in. Without this, a <select>'s
+     own text/background can be styled dark while its native option popup
+     still renders with the browser's light-mode default (assumed whenever
+     color-scheme is unset) -- e.g. light-on-dark option text landing on a
+     white popup background, unreadable. Kept in lockstep with the same
+     three blocks (bare :root / [data-theme='dark'] / prefers-color-scheme)
+     every other token below uses. */
+  color-scheme: light;
+
   /* lima brand scale */
   --lima-50: #f9ffe5;  --lima-100: #f0ffc7; --lima-200: #e1ff95; --lima-300: #ccfe58;
   --lima-400: #b4f526; --lima-500: #95dc06; --lima-600: #76b500; --lima-700: #578506;
@@ -51,6 +61,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --tc-bg: #12160E;
   --tc-card: #1B2115;
   --tc-ink: #F2FFDA;
@@ -68,6 +79,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
+    color-scheme: dark;
     --tc-bg: #12160E;
     --tc-card: #1B2115;
     --tc-ink: #F2FFDA;

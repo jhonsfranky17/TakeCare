@@ -16,6 +16,14 @@ const selectField = {
   outline: "none",
 } as const;
 
+// Belt-and-suspenders on top of tokens.css's color-scheme: some
+// browsers still don't fully theme a native <select>'s option popup from
+// color-scheme alone, so style each <option> explicitly too.
+const optionStyle = {
+  background: "var(--tc-card)",
+  color: "var(--tc-ink)",
+} as const;
+
 /**
  * The app's entry screen -- shown once per device, right after the silent
  * anonymous sign-in, until this device claims a family_members row. No
@@ -121,11 +129,11 @@ export function WhoAreYou(): JSX.Element {
             aria-label="Your name"
             style={selectField}
           >
-            <option value="" disabled>
+            <option value="" disabled style={optionStyle}>
               Select your name…
             </option>
             {unclaimedMembers.map((member) => (
-              <option key={member.id} value={member.id}>
+              <option key={member.id} value={member.id} style={optionStyle}>
                 {member.name}
                 {member.relationship ? ` (${member.relationship})` : ""}
               </option>
