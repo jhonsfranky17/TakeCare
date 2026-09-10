@@ -234,9 +234,12 @@ otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
+# Staying on Supabase's default shared mailer for now (rate-limited to a
+# couple emails/hour, but adequate at this project's volume). `enabled =
+# false` is explicit, not just commented out, so `config push` actually
+# applies it remotely rather than leaving the field undeclared and untouched.
+[auth.email.smtp]
+enabled = false
 # host = "smtp.sendgrid.net"
 # port = 587
 # user = "apikey"
