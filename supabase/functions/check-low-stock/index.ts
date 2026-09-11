@@ -36,10 +36,17 @@ Deno.serve(async (req: Request) => {
 
       const daysRemaining = Math.floor(medicine.current_stock / dailyDoses);
 
-      if (
-        daysRemaining <= medicine.refill_threshold_days &&
-        medicine.low_stock_alert_sent_at === null
-      ) {
+      // Re-alert once per day (this function runs on a daily cron) for as
+      // long as the medicine stays low, instead of only ever alerting once
+      // -- a family can otherwise miss the single alert and never hear about
+      // it again until it runs out entirely. The 20h floor (not 24h) guards
+      // against a same-day re-invocation (cron drift, manual retry) causing
+      // a duplicate alert, while still firing on the next day's run.
+      const hoursSinceLastAlert = medicine.low_stock_alert_sent_at
+        ? (Date.now() - new Date(medicine.low_stock_alert_sent_at).getTime()) / 3_600_000
+        : Infinity;
+
+      if (daysRemaining <= medicine.refill_threshold_days && hoursSinceLastAlert >= 20) {
         await sendPushToPatientFamily(admin, medicine.patient.id, {
           title: "Refill needed",
           body: `${medicine.name} will run out in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} — time to refill`,

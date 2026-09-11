@@ -94,7 +94,7 @@ export function AddMedicineSheet({
           times_per_day: times24h,
           notes: trimmedNotes || null,
           patient_id: patient.id,
-          refill_threshold_days: 7,
+          refill_threshold_days: 3,
         });
 
     setSaving(false);
